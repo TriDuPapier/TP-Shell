@@ -1,15 +1,24 @@
 #!/bin/bash
 
+# Couleurs pour le terminal
+RED='\033[1;31m'
+GREEN='\033[1;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[1;34m'
+CYAN='\033[1;36m'
+WHITE='\033[1;37m'
+NC='\033[0m' # Sans couleur
+
 # Afficher l'aide si aucune commande n'est passée
 if [ $# -eq 0 ]; then
-    echo "Usage: $0 [aggregate|temporal_analysis] logfile.log"
+    echo -e "${YELLOW}Usage: $0 [aggregate|temporal_analysis|error_analysis] logfile.log${NC}"
     exit 1
 fi
 
 # Vérifier que le fichier de logs est passé en paramètre
 if [ $# -ne 2 ]; then
-    echo "Erreur : Deux arguments attendus. Commande et fichier de logs."
-    echo "Usage: $0 [aggregate|temporal_analysis] logfile.log"
+    echo -e "${RED}Erreur : Deux arguments attendus. Commande et fichier de logs.${NC}"
+    echo -e "${YELLOW}Usage: $0 [aggregate|temporal_analysis|error_analysis] logfile.log${NC}"
     exit 1
 fi
 
@@ -18,13 +27,13 @@ LOGFILE=$2
 
 # Vérifier si le fichier existe
 if [ ! -f "$LOGFILE" ]; then
-    echo "Erreur : Le fichier '$LOGFILE' n'existe pas."
+    echo -e "${RED}Erreur : Le fichier '$LOGFILE' n'existe pas.${NC}"
     exit 1
 fi
 
 # Fonction pour agréger les logs
 aggregate_logs() {
-    echo "=-= Aggregating file \"$LOGFILE\" =-="
+    echo -e "${CYAN}=-= Agrégation des logs du fichier \"$LOGFILE\" =-=${NC}"
 
     trace_count=$(grep -c "^\[trace\]" "$LOGFILE")
     debug_count=$(grep -c "^\[debug\]" "$LOGFILE")
@@ -39,33 +48,46 @@ aggregate_logs() {
     least_common_msg=$(grep -o 'msg="[^"]*"' "$LOGFILE" | sort | uniq -c | sort -n | head -1 | awk '{print $2}' | sed 's/msg=//g')
     least_common_msg_count=$(grep -o "$least_common_msg" "$LOGFILE" | wc -l)
 
-    echo "Log level counts:"
-    echo "  - trace: $trace_count"
-    echo "  - debug: $debug_count"
-    echo "  - info:  $info_count"
-    echo "  - warn:  $warn_count"
-    echo "  - error: $error_count"
-    echo "  - fatal: $fatal_count"
+    echo -e "${BLUE}Statistiques par niveau de log :${NC}"
+    echo -e "${GREEN}  - trace:${NC} $trace_count"
+    echo -e "${GREEN}  - debug:${NC} $debug_count"
+    echo -e "${GREEN}  - info:${NC}  $info_count"
+    echo -e "${YELLOW}  - warn:${NC}  $warn_count"
+    echo -e "${RED}  - error:${NC} $error_count"
+    echo -e "${RED}  - fatal:${NC} $fatal_count"
     echo ""
-    echo "Most common message: $most_common_msg (count: $most_common_msg_count)"
-    echo "Least common message: $least_common_msg (count: $least_common_msg_count)"
+    echo -e "${BLUE}Messages fréquents :${NC}"
+    echo -e "${GREEN}  Message le plus fréquent:${NC} \"$most_common_msg\" (${most_common_msg_count} occurrences)"
+    echo -e "${YELLOW}  Message le moins fréquent:${NC} \"$least_common_msg\" (${least_common_msg_count} occurrences)"
     echo ""
-    echo "=-= End of report =-="
+    echo -e "${CYAN}=-= Fin du rapport =-=${NC}"
 }
 
 # Fonction pour analyser les logs temporellement
 temporal_analysis() {
-    echo "=-= \"$LOGFILE\" temporal analysis =-="
+    echo -e "${CYAN}=-= Analyse temporelle des logs du fichier \"$LOGFILE\" =-=${NC}"
 
     most_active_day=$(grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' "$LOGFILE" | sort | uniq -c | sort -nr | head -1 | awk '{print $2}')
     most_active_hour=$(grep -oE '^\[.*\] [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}' "$LOGFILE" | cut -d'T' -f2 | cut -d':' -f1 | sort | uniq -c | sort -nr | head -1 | awk '{print $2}')
     most_errors_hour=$(grep -E '^\[(error|fatal)\]' "$LOGFILE" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}' | cut -d'T' -f2 | cut -d':' -f1 | sort | uniq -c | sort -nr | head -1 | awk '{print $2}')
 
-    echo "Most active day: $most_active_day"
-    echo "Most active hour: ${most_active_hour}h"
-    echo "Most error-prone hour: ${most_errors_hour}h"
+    echo -e "${GREEN}Jour le plus actif :${NC} $most_active_day"
+    echo -e "${GREEN}Heure la plus active :${NC} ${most_active_hour}h"
+    echo -e "${RED}Heure avec le plus d'erreurs :${NC} ${most_errors_hour}h"
     echo ""
-    echo "=-= End of report =-="
+    echo -e "${CYAN}=-= Fin du rapport =-=${NC}"
+}
+
+# Fonction pour analyser spécifiquement les erreurs
+error_analysis() {
+    echo -e "${CYAN}=-= Analyse des erreurs dans \"$LOGFILE\" =-=${NC}"
+
+    error_summary=$(grep -E '^\[(error|fatal)\]' "$LOGFILE" | cut -d']' -f2 | sort | uniq -c | sort -nr)
+
+    echo -e "${RED}Résumé des erreurs et fatales :${NC}"
+    echo "$error_summary"
+    echo ""
+    echo -e "${CYAN}=-= Fin du rapport =-=${NC}"
 }
 
 # Exécuter la commande
@@ -76,8 +98,11 @@ case $COMMAND in
     temporal_analysis)
         temporal_analysis
         ;;
+    error_analysis)
+        error_analysis
+        ;;
     *)
-        echo "Commande invalide. Utilisez [aggregate|temporal_analysis]"
+        echo -e "${RED}Commande invalide.${NC} Utilisez ${YELLOW}[aggregate|temporal_analysis|error_analysis]${NC}."
         exit 1
         ;;
 esac
