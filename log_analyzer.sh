@@ -11,19 +11,18 @@ NC='\033[0m' # Sans couleur
 
 # Afficher l'aide si aucune commande n'est passée
 if [ $# -eq 0 ]; then
-    echo -e "${YELLOW}Usage: $0 [aggregate|temporal_analysis|error_analysis] logfile.log${NC}"
+    echo -e "${YELLOW}Usage: $0 [aggregate|temporal_analysis|error_analysis] logfile.log [--export-csv output.csv]${NC}"
     exit 1
 fi
 
-# Vérifier que le fichier de logs est passé en paramètre
-if [ $# -ne 2 ]; then
-    echo -e "${RED}Erreur : Deux arguments attendus. Commande et fichier de logs.${NC}"
-    echo -e "${YELLOW}Usage: $0 [aggregate|temporal_analysis|error_analysis] logfile.log${NC}"
-    exit 1
-fi
-
+# Vérifier les paramètres
 COMMAND=$1
 LOGFILE=$2
+EXPORT_CSV=""
+
+if [ $# -ge 4 ] && [ "$3" == "--export-csv" ]; then
+    EXPORT_CSV=$4
+fi
 
 # Vérifier si le fichier existe
 if [ ! -f "$LOGFILE" ]; then
@@ -61,6 +60,22 @@ aggregate_logs() {
     echo -e "${YELLOW}  Message le moins fréquent:${NC} \"$least_common_msg\" (${least_common_msg_count} occurrences)"
     echo ""
     echo -e "${CYAN}=-= Fin du rapport =-=${NC}"
+
+    # Exporter en CSV si demandé
+    if [ -n "$EXPORT_CSV" ]; then
+        echo "Log Level,Count" > "$EXPORT_CSV"
+        echo "trace,$trace_count" >> "$EXPORT_CSV"
+        echo "debug,$debug_count" >> "$EXPORT_CSV"
+        echo "info,$info_count" >> "$EXPORT_CSV"
+        echo "warn,$warn_count" >> "$EXPORT_CSV"
+        echo "error,$error_count" >> "$EXPORT_CSV"
+        echo "fatal,$fatal_count" >> "$EXPORT_CSV"
+        echo "" >> "$EXPORT_CSV"
+        echo "Message,Type,Count" >> "$EXPORT_CSV"
+        echo "\"$most_common_msg\",Most Common,$most_common_msg_count" >> "$EXPORT_CSV"
+        echo "\"$least_common_msg\",Least Common,$least_common_msg_count" >> "$EXPORT_CSV"
+        echo -e "${GREEN}Export terminé dans : $EXPORT_CSV${NC}"
+    fi
 }
 
 # Fonction pour analyser les logs temporellement
@@ -76,18 +91,34 @@ temporal_analysis() {
     echo -e "${RED}Heure avec le plus d'erreurs :${NC} ${most_errors_hour}h"
     echo ""
     echo -e "${CYAN}=-= Fin du rapport =-=${NC}"
+
+    # Exporter en CSV si demandé
+    if [ -n "$EXPORT_CSV" ]; then
+        echo "Metric,Value" > "$EXPORT_CSV"
+        echo "Most active day,$most_active_day" >> "$EXPORT_CSV"
+        echo "Most active hour,${most_active_hour}h" >> "$EXPORT_CSV"
+        echo "Most error-prone hour,${most_errors_hour}h" >> "$EXPORT_CSV"
+        echo -e "${GREEN}Export terminé dans : $EXPORT_CSV${NC}"
+    fi
 }
 
-# Fonction pour analyser spécifiquement les erreurs
+# Fonction pour analyser les erreurs
 error_analysis() {
     echo -e "${CYAN}=-= Analyse des erreurs dans \"$LOGFILE\" =-=${NC}"
 
     error_summary=$(grep -E '^\[(error|fatal)\]' "$LOGFILE" | cut -d']' -f2 | sort | uniq -c | sort -nr)
 
-    echo -e "${RED}Résumé des erreurs et fatales :${NC}"
+    echo -e "${RED}Résumé des erreurs :${NC}"
     echo "$error_summary"
     echo ""
     echo -e "${CYAN}=-= Fin du rapport =-=${NC}"
+
+    # Exporter en CSV si demandé
+    if [ -n "$EXPORT_CSV" ]; then
+        echo "Error Type,Count" > "$EXPORT_CSV"
+        echo "$error_summary" | awk '{print $2","$1}' >> "$EXPORT_CSV"
+        echo -e "${GREEN}Export terminé dans : $EXPORT_CSV${NC}"
+    fi
 }
 
 # Exécuter la commande
